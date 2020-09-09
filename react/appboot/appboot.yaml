@@ -1,0 +1,37 @@
+parameters:
+  string:
+    - key: GitHost
+      default: gitlab.com
+    - key: GitGroup
+      default: Makeblock-mblock
+    - key: GitDescription
+      default: 仓库的简介
+    - key: JenkinsFolder
+      default: mblock
+    - key: DevOSSBucket
+      default: dev-web-cn
+    - key: TestOSSBucket
+      default: test-web-cn
+    - key: DistOSSBucket
+      default: dist-web-cn
+    - key: DevDomain
+      default: dev-web.makeblock.com
+    - key: TestDomain
+      default: test-web.makeblock.com
+    - key: DistDomain
+      default: dist-web.makeblock.com
+  select:
+    - key: GitTopics
+      options:
+        - Corbit      
+        - CreatorBox
+        - LaserBox
+        - MakeX
+        - MBcourse
+        - MBextend
+        - mBlock
+        - mblock.cc官网
+        - mBlockAPP
+        - mCode
+        - Passport
+        - STEAMPlatform

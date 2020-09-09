@@ -1,0 +1,32 @@
+parameters:
+  string:
+    - key: GitHost
+      default: gitlab.com
+    - key: GitGroup
+      default: makeblock-common
+    - key: GitDescription
+      default: 仓库的简介    
+    - key: JenkinsFolder
+      default: common
+    - key: Namespace
+      default: mblock
+  int:
+    - key: Port
+      default: 8000
+      min: 0
+      max: 65535
+  select:
+    - key: GitTopics
+      options:
+        - Corbit      
+        - CreatorBox
+        - LaserBox
+        - MakeX
+        - MBcourse
+        - MBextend
+        - mBlock
+        - mblock.cc官网
+        - mBlockAPP
+        - mCode
+        - Passport
+        - STEAMPlatform

@@ -1,0 +1,7 @@
+namespace: prod-{{.Namespace}}
+
+bases:
+- ../../base
+
+patchesStrategicMerge:
+- deploy.yaml

@@ -1,0 +1,8 @@
+parameters:
+  string:
+    - key: GitHost
+      default: gitlab.com
+    - key: GitGroup
+      default: makeblock-devops
+    - key: DockerGroup
+      default: registry.cn-hangzhou.aliyuncs.com/makeblock

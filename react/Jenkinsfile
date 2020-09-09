@@ -1,0 +1,171 @@
+pipeline {
+  agent none
+  environment {
+    APP_NAME = '{{.Name}}'
+    OSS_DEV = 'oss://{{.DevOSSBucket}}/{{.Name}}/'
+    OSS_TEST = 'oss://{{.TestOSSBucket}}/{{.Name}}/'
+    OSS_DIST = 'oss://{{.DistOSSBucket}}/{{.Name}}/'
+    DEV_WEBSITE_URL  = 'http://{{.DevDomain}}/{{.Name}}/index.html'
+    TEST_WEBSITE_URL  = 'http://{{.TestDomain}}/{{.Name}}/index.html'
+    DIST_WEBSITE_URL  = 'http://{{.DistDomain}}/{{.Name}}/index.html'
+  }
+  stages {
+    stage('notify-start') {
+      agent { docker 'makeblock/dingtalk' }
+      when {
+        anyOf {
+          branch 'master'; branch 'release/*'; tag "release*"
+        }
+      }
+      steps {
+        script {
+          sh "dingtalk link -t ${MBLOCK_DING_TOKEN} -s ${MBLOCK_DING_SECRET} -i \"${APP_NAME} CI start on ${BRANCH_NAME}\" -e \"${GIT_COMMIT}\" -u \"${RUN_DISPLAY_URL}\" -p \"${COMMON_DING_PICTURE}\""
+        }
+      }
+    }
+    stage('prepare') {
+      agent {
+        docker {
+          image 'registry.cn-hangzhou.aliyuncs.com/makeblock/fsbm:12.13.1'
+          registryUrl 'https://registry.cn-hangzhou.aliyuncs.com'
+          registryCredentialsId 'aliyun-docker'
+        }
+      }
+      when {
+        anyOf {
+          branch 'master'; branch 'release/*'; tag "release*"
+        }
+      }
+      steps {
+        sh "yarn"
+      }
+    }
+    stage('test') {
+      agent {
+        docker {
+          image 'registry.cn-hangzhou.aliyuncs.com/makeblock/fsbm:12.13.1'
+          registryUrl 'https://registry.cn-hangzhou.aliyuncs.com'
+          registryCredentialsId 'aliyun-docker'
+        }
+      }
+      options { skipDefaultCheckout() }
+      when {
+        anyOf {
+          branch 'master'; branch 'release/*'; tag "release*"
+        }
+      }
+      steps {
+        sh "npm run test:coverage"
+      }
+    }
+    stage('sonarqube') {
+      agent { label 'docker' }
+      options { skipDefaultCheckout() }
+      when {
+        anyOf {
+          branch 'master'; branch 'release/*'
+        }
+      }
+      environment {
+        scannerHome = tool 'SonarQubeScanner'
+        APP_VERSION = sh(script: "cat package.json | grep version | head -1 | awk -F: '{ print \$2 }' | sed 's/[\",]//g' | tr -d '[[:space:]]'", returnStdout: true).trim()
+      }
+      steps {
+        withSonarQubeEnv('SonarQube Server') {
+          script {
+            sh "${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=${APP_NAME}:key -Dsonar.projectName=${APP_NAME} -Dsonar.projectVersion=${APP_VERSION} -Dsonar.sources=src -Dsonar.exclusions=**/node_modules/**/* -Dsonar.tests=src -Dsonar.test.inclusions=**/*test.ts,**/*test.tsx,**/*.spec.ts,**/*.spec.tsx -Dsonar.language=ts -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info"
+          }
+        }
+      }
+    }
+    stage('build') {
+      agent {
+        docker {
+          image 'registry.cn-hangzhou.aliyuncs.com/makeblock/fsbm:12.13.1'
+          registryUrl 'https://registry.cn-hangzhou.aliyuncs.com'
+          registryCredentialsId 'aliyun-docker'
+        }
+      }
+      options { skipDefaultCheckout() }
+      when {
+        anyOf {
+          branch 'master'; branch 'release/*'; tag "release*"
+        }
+      }
+      steps {
+        script {
+          if (env.TAG_NAME != null) {
+            if (env.TAG_NAME.matches("release(.*)")) {
+              sh "yarn build"
+            }
+          } else {
+            if (env.BRANCH_NAME == 'master') {
+              sh "yarn build"
+            } else {
+              sh "yarn build"
+            }
+          }
+        }
+      }
+    }
+    stage('deploy') {
+      agent {
+        docker {
+          image 'makeblock/ossutil'
+          args '-v /devops/oss/ossutilconfig:/root/.ossutilconfig -u root'
+        }
+      }
+      options { skipDefaultCheckout() }
+      when {
+        anyOf {
+          branch 'master'; branch 'release/*'; tag "release*"
+        }
+      }
+      steps {
+        script {
+          if (env.TAG_NAME != null) {
+            if (env.TAG_NAME.matches("release(.*)")) {
+              sh "ossutil --endpoint=oss-cn-shenzhen.aliyuncs.com cp -rf build/ ${OSS_DIST} -u"
+            }
+          } else {
+            if (env.BRANCH_NAME == 'master') {
+              sh "ossutil --endpoint=oss-cn-shenzhen.aliyuncs.com cp -rf build/ ${OSS_DEV} -u"
+            } else {
+              sh "ossutil --endpoint=oss-cn-shenzhen.aliyuncs.com cp -rf build/ ${OSS_TEST} -u"
+            }
+          }
+        }
+      }
+    }
+    stage('notify-success') {
+      agent { docker 'makeblock/dingtalk' }
+      when {
+        anyOf {
+          branch 'master'; branch 'release/*'; tag "release*"
+        }
+      }
+      steps {
+        script {
+          if (env.TAG_NAME != null) {
+            if (env.TAG_NAME.matches("release(.*)")) {
+              sh "dingtalk link -t ${MBLOCK_DING_TOKEN} -s ${MBLOCK_DING_SECRET} -i \"${APP_NAME} CI success on ${BRANCH_NAME}\" -e \"${GIT_COMMIT}\" -u \"${DIST_WEBSITE_URL}\" -p \"${COMMON_DING_PICTURE}\""
+            }
+          } else {
+            if (env.BRANCH_NAME == 'master') {
+              sh "dingtalk link -t ${MBLOCK_DING_TOKEN} -s ${MBLOCK_DING_SECRET} -i \"${APP_NAME} CI success on ${BRANCH_NAME}\" -e \"${GIT_COMMIT}\" -u \"${DEV_WEBSITE_URL}\" -p \"${COMMON_DING_PICTURE}\""
+            } else {
+              sh "dingtalk link -t ${MBLOCK_DING_TOKEN} -s ${MBLOCK_DING_SECRET} -i \"${APP_NAME} CI success on ${BRANCH_NAME}\" -e \"${GIT_COMMIT}\" -u \"${TEST_WEBSITE_URL}\" -p \"${COMMON_DING_PICTURE}\""
+            }
+          }
+        }
+      }
+    }
+  }
+  post {
+    failure {
+      node('docker'){
+        sh "docker run makeblock/dingtalk dingtalk text -t ${MBLOCK_DING_TOKEN} -s ${MBLOCK_DING_SECRET} -c \"${APP_NAME} CI failed on ${BRANCH_NAME}\" -a"
+      }
+    }
+  }
+}

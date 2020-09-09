@@ -1,0 +1,7 @@
+namespace: test-{{.Namespace}}
+
+bases:
+- ../../base
+
+patchesStrategicMerge:
+- deploy.yaml

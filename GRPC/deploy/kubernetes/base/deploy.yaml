@@ -1,0 +1,107 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: {{.Name}}
+  labels:
+    app: {{.Name}}
+    version: v1
+spec:
+  minReadySeconds: 1
+  selector:
+    matchLabels:
+      app: {{.Name}}
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: {{.Name}}
+        version: v1
+    spec:
+      restartPolicy: Always
+      imagePullSecrets:
+      - name: mb-hangzhou
+      containers:
+      - imagePullPolicy: Always
+        name: {{.Name}}
+        image: {{.Name}}
+        env:
+        - name: MYSQL_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: mysql-config
+              key: host
+        - name: MYSQL_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: mysql-config
+              key: port
+        - name: MYSQL_USER
+          valueFrom:
+            configMapKeyRef:
+              name: mysql-config
+              key: user
+        - name: MYSQL_PWD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: pwd
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: redis-config
+              key: host
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: redis-config
+              key: port
+        - name: REDIS_PWD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: pwd        
+        resources:
+          requests:
+            cpu: 20m
+            memory: 50Mi
+          limits:
+            cpu: 200m
+            memory: 500Mi
+        ports:
+        - containerPort: {{.Port}}
+          name: grpc
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{.Name}}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1beta2
+    kind: Deployment
+    name: {{.Name}}
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      targetAverageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      targetAverageUtilization: 90
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{.Name}}
+  labels:
+    app: {{.Name}}
+spec:
+  ports:
+  - name: grpc
+    port: {{.Port}}
+    targetPort: {{.Port}}
+  selector:
+    app: {{.Name}}
