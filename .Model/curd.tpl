@@ -11,7 +11,7 @@ type {{.StructName}} struct {
 
 var {{.StructName}}Default {{.StructName}}
 
-// Table is function set the ORM database name
+// TableName is function set the ORM database name
 func (c *{{.StructName}})TableName() string {
 	return "{{.TableName}}"
 }
